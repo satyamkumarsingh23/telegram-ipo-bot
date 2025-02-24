@@ -1,27 +1,73 @@
-import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
+import logging
 
-def get_offering_data():
-    url = "https://merolagani.com/IPO.aspx"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
-    offering_list = []
-    
-    for row in soup.select("table tr")[1:]:  # Skip table header
-        cols = row.find_all("td")
-        if len(cols) >= 5:  # Ensure the row has enough columns
-            name = cols[0].text.strip()
-            open_date = cols[3].text.strip()
-            close_date = cols[4].text.strip()
+def get_open_ipos():
+    """Scrapes open IPO/FPO data and filters only 'Ordinary' share types."""
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")  # Run in headless mode
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-            # Determine if it's an IPO or FPO based on the name
-            offering_type = "FPO" if "FPO" in name.upper() else "IPO"
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
 
-            offering_list.append((name, offering_type, open_date, close_date))
+    try:
+        url = "https://nepalipaisa.com/ipo"
+        driver.get(url)
 
-    return offering_list  # List of (Company Name, Offering Type, Open Date, Close Date)
+        # Wait until the table is loaded (max wait: 10 seconds)
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "tbody"))
+        )
 
-# Test the function
-if __name__ == "__main__":
-    print(get_offering_data())  # Run this to verify IPOs & FPOs are detected correctly
+        # Extract page source after JavaScript execution
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+
+        # Locate the IPO/FPO table
+        table = soup.find("tbody")
+        if not table:
+            logging.error("❌ No IPO table found.")
+            return []
+
+        ipo_data = []
+        rows = table.find_all("tr")
+
+        for row in rows:
+            columns = row.find_all("td")
+            if len(columns) < 7:
+                continue  # Skip incomplete rows
+
+            company = columns[0].text.strip()
+            share_type = columns[1].text.strip()
+            open_date = columns[3].find("abbr")["title"] if columns[3].find("abbr") else "N/A"
+            close_date = columns[4].find("abbr")["title"] if columns[4].find("abbr") else "N/A"
+            status = columns[6].text.strip()
+
+            # Filter only 'Ordinary' share types and open status
+            if share_type == "Ordinary" and status == "Open":
+                ipo_data.append({
+                    "company": company,
+                    "share_type": share_type,
+                    "open_date": open_date,
+                    "close_date": close_date,
+                    "status": status
+                })
+
+        logging.info(f"✅ {len(ipo_data)} Open IPOs Found.")
+        return ipo_data
+
+    except Exception as e:
+        logging.error(f"❌ Error while scraping: {e}")
+        return []
+
+    finally:
+        driver.quit()  # Close the browser

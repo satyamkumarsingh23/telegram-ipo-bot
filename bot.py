@@ -1,28 +1,49 @@
-import telegram
-import schedule
-import time
+import os
+import asyncio
+import logging
 from datetime import datetime
-from config import BOT_TOKEN, CHAT_ID
-from scraper import get_offering_data  # Updated function name
+import pytz
+from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from scraper import get_open_ipos  # Ensure scraper.py is correctly fetching IPO data
 
-bot = telegram.Bot(token=BOT_TOKEN)
+# Load environment variables
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-def send_offering_alert():
-    offering_list = get_offering_data()  # Fetch IPO & FPO data
-    today = datetime.today().strftime('%Y-%m-%d')
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 
-    messages = []
-    for name, offering_type, open_date, close_date in offering_list:
-        if open_date <= today <= close_date:  # Check if offering is open
-            messages.append(f"📢 {offering_type} Open: {name}\n📅 Open Date: {open_date}\n📅 Close Date: {close_date}")
+# Initialize bot and scheduler
+bot = Bot(token=TOKEN)
+scheduler = AsyncIOScheduler()
 
-    if messages:
-        bot.send_message(chat_id=CHAT_ID, text="\n\n".join(messages))
+# Nepal timezone
+nepal_tz = pytz.timezone("Asia/Kathmandu")
 
-# Schedule to run at 11 AM every day
-schedule.every().day.at("11:00").do(send_offering_alert)
+async def send_alert():
+    """Fetch open IPOs and send an alert if any are available."""
+    open_ipos = get_open_ipos()  # Get currently open IPOs
+    if not open_ipos:
+        logging.info("No open IPOs to alert.")
+        return
 
-print("Bot is running...")
-while True:
-    schedule.run_pending()
-    time.sleep(30)  # Check every 30 seconds
+    message = "📢 *Open IPO/FPO Alerts:*\n\n"
+    for ipo in open_ipos:
+        message += f"🏢 *Company:* {ipo['company']}\n📅 *Opening Date:* {ipo['open_date']}\n📅 *Closing Date:* {ipo['close_date']}\n⚡ *Status:* {ipo['status']}\n\n"
+
+    # Send message
+    await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
+    logging.info("✅ Alert sent successfully!")
+
+# Schedule job to run at 10 AM Nepal Time daily
+scheduler.add_job(send_alert, "cron", hour=10, minute=0, timezone=nepal_tz)
+
+async def main():
+    """Start the scheduler and keep the script running."""
+    scheduler.start()
+    while True:
+        await asyncio.sleep(3600)  # Prevent script from exiting
+
+if __name__ == "__main__":
+    asyncio.run(main())
