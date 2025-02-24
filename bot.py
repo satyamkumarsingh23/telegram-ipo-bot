@@ -8,8 +8,8 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from scraper import get_open_ipos  # Ensure scraper.py is correctly fetching IPO data
 
 # Load environment variables
-TOKEN = os.getenv("7404029075:AAGWSV_sRFSQzkMXU-r0HBwmDY6K1f-n77g")
-CHAT_ID = os.getenv("1300093576")
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
