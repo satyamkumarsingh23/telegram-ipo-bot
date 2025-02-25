@@ -1,12 +1,11 @@
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-import logging
 import os
-import shutil
 import subprocess
 
 # Set up logging
@@ -14,34 +13,39 @@ logging.basicConfig(level=logging.INFO)
 
 def install_chrome():
     """Install Google Chrome and Chromedriver if not already installed."""
-    if not shutil.which("google-chrome"):
-        logging.info("🚀 Installing Google Chrome...")
+    logging.info("🚀 Installing Google Chrome...")
+
+    try:
         subprocess.run(
-            "wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt update && apt install -y ./google-chrome.deb",
+            "apt update && apt install -y google-chrome-stable",
             shell=True,
             check=True
         )
+        logging.info("✅ Google Chrome installed successfully.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"❌ Failed to install Chrome: {e}")
+        return False
 
-    if not shutil.which("chromedriver"):
-        logging.info("🚀 Installing ChromeDriver...")
-        subprocess.run(
-            "wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip && unzip chromedriver.zip -d /usr/local/bin/",
-            shell=True,
-            check=True
-        )
-
-# Install Chrome if needed
-install_chrome()
+    return True
 
 def get_open_ipos():
     """Scrapes open IPO/FPO data and filters only 'Ordinary' share types."""
+    
+    # Ensure Chrome is installed before proceeding
+    if not install_chrome():
+        return []
+
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")  # Run in headless mode
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/google-chrome"  # Set correct Chrome path
 
-    service = Service("/usr/local/bin/chromedriver")  # Set correct Chromedriver path
+    # Set correct Chrome binary path
+    options.binary_location = "/usr/bin/google-chrome-stable"
+
+    # Use default Chromedriver from the system
+    service = Service("/usr/bin/chromedriver")  
+
     driver = webdriver.Chrome(service=service, options=options)
 
     try:
