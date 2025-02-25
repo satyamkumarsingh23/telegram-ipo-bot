@@ -6,9 +6,11 @@ RUN apt update && apt install -y wget unzip curl \
 && wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
 && dpkg -i google-chrome.deb || apt install -fy \
 && rm google-chrome.deb \
-&& wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip \
+&& wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE)/chromedriver_linux64.zip \
 && unzip chromedriver.zip -d /usr/local/bin/ \
+&& chmod +x /usr/local/bin/chromedriver \
 && rm chromedriver.zip
+
 
 
 # Set environment variables
