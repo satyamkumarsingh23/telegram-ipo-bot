@@ -3,12 +3,35 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import logging
+import os
+import shutil
+import subprocess
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
+
+def install_chrome():
+    """Install Google Chrome and Chromedriver if not already installed."""
+    if not shutil.which("google-chrome"):
+        logging.info("🚀 Installing Google Chrome...")
+        subprocess.run(
+            "wget -q -O google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt update && apt install -y ./google-chrome.deb",
+            shell=True,
+            check=True
+        )
+
+    if not shutil.which("chromedriver"):
+        logging.info("🚀 Installing ChromeDriver...")
+        subprocess.run(
+            "wget -q -O chromedriver.zip https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip && unzip chromedriver.zip -d /usr/local/bin/",
+            shell=True,
+            check=True
+        )
+
+# Install Chrome if needed
+install_chrome()
 
 def get_open_ipos():
     """Scrapes open IPO/FPO data and filters only 'Ordinary' share types."""
@@ -16,8 +39,9 @@ def get_open_ipos():
     options.add_argument("--headless")  # Run in headless mode
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.binary_location = "/usr/bin/google-chrome"  # Set correct Chrome path
 
-    service = Service(ChromeDriverManager().install())
+    service = Service("/usr/local/bin/chromedriver")  # Set correct Chromedriver path
     driver = webdriver.Chrome(service=service, options=options)
 
     try:
