@@ -47,7 +47,7 @@ async def send_alert():
     logging.info("✅ Alert sent successfully!")
 
 # Schedule job to run at 10 AM Nepal Time daily
-scheduler.add_job(send_alert, "cron", hour=1, minute=22, timezone=nepal_tz)
+scheduler.add_job(send_alert, "cron", hour=1, minute=27, timezone=nepal_tz)
 
 async def main():
     """Start the scheduler and keep the script running."""
