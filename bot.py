@@ -5,11 +5,19 @@ from datetime import datetime
 import pytz
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from scraper import get_open_ipos  # Ensure scraper.py is correctly fetching IPO data
+from dotenv import load_dotenv
+from scraper import get_open_ipos  # Ensure scraper.py fetches IPO data correctly
 
 # Load environment variables
+load_dotenv()
 TOKEN = os.getenv("TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
+
+# Validate TOKEN and CHAT_ID
+if not TOKEN:
+    raise ValueError("❌ TOKEN is missing! Make sure it is set in the .env file.")
+if not CHAT_ID:
+    raise ValueError("❌ CHAT_ID is missing! Make sure it is set in the .env file.")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -22,14 +30,16 @@ scheduler = AsyncIOScheduler()
 nepal_tz = pytz.timezone("Asia/Kathmandu")
 
 async def send_alert():
-    """Fetch open IPOs and send an alert if any are available."""
+    """Fetch open IPOs of type 'Ordinary' and send an alert."""
     open_ipos = get_open_ipos()  # Get currently open IPOs
-    if not open_ipos:
-        logging.info("No open IPOs to alert.")
+    ordinary_ipos = [ipo for ipo in open_ipos if ipo.get("type") == "Ordinary"]
+
+    if not ordinary_ipos:
+        logging.info("No 'Ordinary' IPOs open today. Skipping alert.")
         return
 
     message = "📢 *Open IPO/FPO Alerts:*\n\n"
-    for ipo in open_ipos:
+    for ipo in ordinary_ipos:
         message += f"🏢 *Company:* {ipo['company']}\n📅 *Opening Date:* {ipo['open_date']}\n📅 *Closing Date:* {ipo['close_date']}\n⚡ *Status:* {ipo['status']}\n\n"
 
     # Send message
@@ -37,7 +47,7 @@ async def send_alert():
     logging.info("✅ Alert sent successfully!")
 
 # Schedule job to run at 10 AM Nepal Time daily
-scheduler.add_job(send_alert, "cron", hour=10, minute=0, timezone=nepal_tz)
+scheduler.add_job(send_alert, "cron", hour=12, minute=10, timezone=nepal_tz)
 
 async def main():
     """Start the scheduler and keep the script running."""
