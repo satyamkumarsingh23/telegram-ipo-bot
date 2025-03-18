@@ -32,7 +32,8 @@ nepal_tz = pytz.timezone("Asia/Kathmandu")
 async def send_alert():
     """Fetch open IPOs of type 'Ordinary' and send an alert."""
     open_ipos = get_open_ipos()  # Get currently open IPOs
-    ordinary_ipos = [ipo for ipo in open_ipos if ipo.get("type") == "Ordinary"]
+    ordinary_ipos = [ipo for ipo in open_ipos if ipo.get("share_type") == "Ordinary"]
+
 
     if not ordinary_ipos:
         logging.info("No 'Ordinary' IPOs open today. Skipping alert.")
