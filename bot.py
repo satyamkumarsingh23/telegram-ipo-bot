@@ -48,7 +48,8 @@ async def send_alert():
     logging.info("✅ Alert sent successfully!")
 
 # Schedule job to run at 10 AM Nepal Time daily
-scheduler.add_job(send_alert, "cron", hour=13, minute=31, timezone=nepal_tz)
+scheduler.add_job(send_alert, "cron", hour=10, minute=0, timezone=nepal_tz)
+
 
 async def main():
     """Start the scheduler and keep the script running."""
@@ -58,3 +59,7 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+async def manual_test():
+    await bot.send_message(chat_id=CHAT_ID, text="✅ Manual test message!", parse_mode="Markdown")
+
+asyncio.run(manual_test())
