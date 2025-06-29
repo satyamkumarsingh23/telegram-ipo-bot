@@ -1,64 +1,99 @@
-import os
 import time
-import asyncio
-import logging
-import requests
-import subprocess
-from apscheduler.schedulers.background import BackgroundScheduler
-from scraper import scrape_and_send_alert  # Import your scraping function
+import pytz
+import json
+import schedule
+from datetime import datetime
+import chromedriver_autoinstaller
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from telegram import Bot
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+chromedriver_autoinstaller.install()
 
-# Telegram Bot Token and Chat ID
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+options = Options()
+options.add_argument('--headless')
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
+driver = webdriver.Chrome(options=options)
+# Replace with your actual values
+import os
 
-# Function to send a test message
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
-    
-    try:
-        response = requests.post(url, json=payload)
-        if response.status_code == 200:
-            logging.info("Test message sent successfully.")
-        else:
-            logging.error(f"Failed to send message: {response.text}")
-    except Exception as e:
-        logging.error(f"Error sending message: {str(e)}")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-# Function to install Chrome and ChromeDriver
-def install_chrome_and_driver():
-    logging.info("Installing Chrome and ChromeDriver...")
 
-    # Install Chrome
-    subprocess.run("apt update", shell=True, check=True)
-    subprocess.run("apt install -y wget unzip", shell=True, check=True)
-    subprocess.run("wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb", shell=True, check=True)
-    subprocess.run("apt install -y ./google-chrome-stable_current_amd64.deb", shell=True, check=True)
+def get_open_ordinary_ipos():
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    driver = webdriver.Chrome(options=options)
 
-    # Install ChromeDriver
-    subprocess.run("wget https://chromedriver.storage.googleapis.com/114.0.5735.90/chromedriver_linux64.zip", shell=True, check=True)
-    subprocess.run("unzip chromedriver_linux64.zip", shell=True, check=True)
-    subprocess.run("mv chromedriver /usr/bin/chromedriver", shell=True, check=True)
-    subprocess.run("chmod +x /usr/bin/chromedriver", shell=True, check=True)
+    driver.get("https://nepalipaisa.com/ipo")
+    time.sleep(5)
 
-    logging.info("Chrome and ChromeDriver installed successfully.")
+    rows = driver.find_elements("css selector", "#tblIpo tbody tr")
+    ordinary_open_ipos = []
 
-# Function to schedule the daily alert job
-def schedule_alert():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scrape_and_send_alert, "cron", hour=4, minute=15, timezone="Asia/Kathmandu")  # Runs at 10 AM NPT
-    scheduler.start()
-    logging.info("Scheduler started.")
+    for row in rows:
+        cols = row.find_elements("tag name", "td")
+        if len(cols) < 8:
+            continue
 
-# Main function
-if __name__ == "__main__":
-    install_chrome_and_driver()  # Install necessary dependencies
-    send_telegram_message("🚀 Bot started successfully!")  # Send test message on startup
-    schedule_alert()  # Schedule IPO/FPO alerts
+        share_type = cols[1].text.strip().lower()
+        status = cols[6].text.strip().lower()
 
-    # Keep the bot running to prevent Railway from stopping it
+        if share_type == "ordinary" and status == "open":
+            ipo = {
+                "company_name": cols[0].text.strip(),
+                "share_type": cols[1].text.strip(),
+                "opening_date": cols[3].find_element("tag name", "abbr").get_attribute("title"),
+                "closing_date": cols[4].find_element("tag name", "abbr").get_attribute("title"),
+                "document_link": None
+            }
+
+            link = cols[7].find_elements("tag name", "a")
+            if link:
+                ipo["document_link"] = link[0].get_attribute("href")
+
+            ordinary_open_ipos.append(ipo)
+
+    driver.quit()
+    return ordinary_open_ipos
+
+def send_ipo_alert():
+    bot = Bot(token=BOT_TOKEN)
+    ipos = get_open_ordinary_ipos()
+
+    if not ipos:
+        return  # ❌ No ordinary open IPOs — stay silent
+
+    for ipo in ipos:
+        message = (
+            f"📢 *Open IPO Alert*\n"
+            f"🏢 Company: {ipo['company_name']}\n"
+            f"📄 Type: {ipo['share_type']}\n"
+            f"🗓️ Open: {ipo['opening_date']}\n"
+            f"🗓️ Close: {ipo['closing_date']}\n"
+        )
+        if ipo['document_link']:
+            message += f"🔗 [View Document]({ipo['document_link']})"
+
+        bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
+
+# Run daily at 10:00 AM Nepal Time
+def run_daily_check():
+    npt = pytz.timezone("Asia/Kathmandu")
+
+    def job():
+        now = datetime.now(npt)
+        if now.hour == 10 and now.minute == 0:
+            send_ipo_alert()
+
+    schedule.every().minute.do(job)
+
     while True:
-        time.sleep(60)
+        schedule.run_pending()
+        time.sleep(30)
+
+if __name__ == "__main__":
+    run_daily_check()
