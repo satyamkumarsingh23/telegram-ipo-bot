@@ -40,6 +40,7 @@ def get_open_ordinary_ipos():
                 "company_name": cols[0].text.strip(),
                 "opening_date": cols[3].find_element("tag name", "abbr").get_attribute("title"),
                 "closing_date": cols[4].find_element("tag name", "abbr").get_attribute("title"),
+                "units": cols[2].text.strip(),
             }
 
             
@@ -61,6 +62,7 @@ def send_ipo_alert():
             f"🏢 Company: {ipo['company_name']}\n"
             f"🗓️ Open: {ipo['opening_date']}\n"
             f"🗓️ Close: {ipo['closing_date']}\n"
+            f"📊 Units: {ipo['units']}"
         )
      
         bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
