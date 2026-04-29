@@ -1,0 +1,1 @@
+It enables a Telegram bot(created using botfather) to send messages about the IPO opened in Nepse for general public. The message consists of name of the IPO issuing company, issued units, opening and closing date.
